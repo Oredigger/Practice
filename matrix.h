@@ -11,13 +11,14 @@ typedef struct mat
 
 // Matrix operations
 mat_t *init(size_t, size_t);
-mat_t *ext_col(mat_t *, size_t);
+mat_t *col_vec(mat_t *, size_t);
+mat_t *mat_mult(mat_t *, mat_t *);
 
 // Linear algebra
-void lu_fact(mat_t *, mat_t *, mat_t *);
-mat_t inv_mat(mat_t *);
-int is_inv(mat_t *);
+void   lu_fact(mat_t **, mat_t **, mat_t *);
+mat_t *inv_mat(mat_t *);
 
+// Cleanup
 void free_mat(mat_t *);
 void print_mat(mat_t *);
 
