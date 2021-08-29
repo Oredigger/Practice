@@ -14,8 +14,8 @@ mat_t *init(int row, int col)
 	m->row = row;
 	m->col = col;
 	
-	m->elements = (double **) calloc(m->row, sizeof(double *));
-	if (!m->elements)
+	m->elem = (double **) calloc(m->row, sizeof(double *));
+	if (!m->elem)
 	{
 		free(m);
 		m = NULL;
@@ -25,13 +25,13 @@ mat_t *init(int row, int col)
 
 	for (int i = 0; i < m->row; i++)
 	{
-		m->elements[i] = NULL;	
+		m->elem[i] = NULL;	
 	}
 
 	for (int i = 0; i < m->row; i++)
 	{
-		m->elements[i] = (double *) calloc(m->col, sizeof(double));	
-		if (!m->elements[i])
+		m->elem[i] = (double *) calloc(m->col, sizeof(double));	
+		if (!m->elem[i])
 		{
 			free_mat(m);
 		}
@@ -40,26 +40,54 @@ mat_t *init(int row, int col)
 	return m;
 }
 
-mat_t *col_vec(mat_t *m_src, int target_col)
+mat_t *get_v_col(mat_t *m_src, int target_col)
 {
-	if (target_col > m_src->col + 1)
+	int m = m_src->row;
+	int n = m_src->col;
+
+	if (target_col > n || target_col < 0)
 	{
 		return NULL;
 	}
 
-	mat_t *m_dest = init(m_src->row, 1);
-	if (!m_dest)
+	mat_t *m_col = init(m, 1);
+	if (!m_col)
 	{
 		return NULL;
 	}
 
-	for (int i = 0; i < m_dest->row; i++)
+	for (int i = 0; i < m; i++)
 	{
-		m_dest->elements[i][0] = m_src->elements[i][target_col - 1];
+		m_col->elem[i][0] = m_src->elem[i][target_col];
 	}
 
-	return m_dest;
+	return m_col;
 }
+
+mat_t *get_v_row(mat_t *m_src, int target_row)
+{
+	int m = m_src->row;
+	int n = m_src->col;
+
+	if (target_row > m || target_row < 0)
+	{
+		return NULL;
+	}
+
+	mat_t *m_row = init(1, n);
+	if (!m_row)
+	{
+		return NULL;
+	}
+
+	for (int i = 0; i < m; i++)
+	{
+		m_row->elem[0][i] = m_src->elem[target_row][i];
+	}
+
+	return m_row;
+}
+
 
 mat_t *mat_mult(mat_t *m_A, mat_t *m_B)
 {
@@ -68,7 +96,7 @@ mat_t *mat_mult(mat_t *m_A, mat_t *m_B)
 		return NULL;
 	}
 
-	mat_t* m_result = init(m_A->row, m_B->col);
+	mat_t *m_result = init(m_A->row, m_B->col);
 	if (!m_result)
 	{
 		return NULL;
@@ -82,29 +110,51 @@ mat_t *mat_mult(mat_t *m_A, mat_t *m_B)
 			
 			for (int k = 0; k < m_A->col; k++)
 			{
-				dot_prod += m_A->elements[i][k]*m_B->elements[k][j];
+				dot_prod += m_A->elem[i][k]*m_B->elem[k][j];
 			}
 
-			m_result->elements[i][j] = dot_prod; 
+			m_result->elem[i][j] = dot_prod; 
 		}
 	}
 
 	return m_result;
 }
 
-int lu_fact(mat_t **mat_l, mat_t **mat_u, mat_t *mat_src)
+mat_t *mat_transpose(mat_t *m_A)
 {
-	int m = mat_src->row;
-	int n = mat_src->col;
+	int m = m_A->col;
+	int n = m_A->row;
 
-	*mat_l = init(m, m);
-	if (!(*mat_l))
+	mat_t *m_transpose = init(m, n);
+	if (!m_transpose)
+	{
+		return NULL;		
+	}
+
+	for (int i = 0; i < m; i++)
+	{
+		for (int j = 0; j < n; j++)
+		{
+			m_transpose->elem[i][j] = m_A->elem[j][i];
+		}
+	}
+
+	return m_transpose;
+}
+
+int lu_fact(mat_t **m_l, mat_t **m_u, mat_t *m_src)
+{
+	int m = m_src->row;
+	int n = m_src->col;
+
+	*m_l = init(m, m);
+	if (!(*m_l))
 	{
 		return -1;
 	}
 
-	*mat_u = init(m, n);
-	if (!(*mat_u))
+	*m_u = init(m, n);
+	if (!(*m_u))
 	{
 		return -1;
 	}
@@ -113,39 +163,39 @@ int lu_fact(mat_t **mat_l, mat_t **mat_u, mat_t *mat_src)
 	{
 		// Populate mat_l and mat_u with known immediate values from mat_src based on their
 		// definitions.
-		(*mat_u)->elements[0][i] = mat_src->elements[0][i];
-		(*mat_l)->elements[i][i] = 1;
-		(*mat_l)->elements[i][0] = mat_src->elements[i][0]/mat_src->elements[0][0];
+		(*m_u)->elem[0][i] = m_src->elem[0][i];
+		(*m_l)->elem[i][i] = 1;
+		(*m_l)->elem[i][0] = m_src->elem[i][0]/m_src->elem[0][0];
 		
 		// Solve unknowns in row i in mat_l
 		for (int j = 1; j < i; j++)
 		{
-			(*mat_l)->elements[i][j] = mat_src->elements[i][j];
+			(*m_l)->elem[i][j] = m_src->elem[i][j];
 			
 			for (int k = 0; k < j; k++)
 			{
-				(*mat_l)->elements[i][j] -= (*mat_l)->elements[i][k]*(*mat_u)->elements[k][j];
+				(*m_l)->elem[i][j] -= (*m_l)->elem[i][k]*(*m_u)->elem[k][j];
 			}
 			
-			(*mat_l)->elements[i][j] = (*mat_l)->elements[i][j]/(*mat_u)->elements[j][j];
+			(*m_l)->elem[i][j] = (*m_l)->elem[i][j]/(*m_u)->elem[j][j];
 		}
 
 		// Solve unknowns in row j in mat_u
 		for (int j = i; j < n; j++)
 		{
-			(*mat_u)->elements[i][j] = mat_src->elements[i][j];
+			(*m_u)->elem[i][j] = m_src->elem[i][j];
 			
 			for (int k = 0; k < i; k++)
 			{
-				(*mat_u)->elements[i][j] -= (*mat_l)->elements[i][k]*(*mat_u)->elements[k][j];
+				(*m_u)->elem[i][j] -= (*m_l)->elem[i][k]*(*m_u)->elem[k][j];
 			}
 		}
 	}
 
 	// Check for singularity in mat_l or mat_u
-	for (int i = 0; i < mat_src->row; i++)
+	for (int i = 0; i < m; i++)
 	{
-		if (!(*mat_l)->elements[i][i] || !(*mat_u)->elements[i][i])
+		if (!(*m_l)->elem[i][i] || !(*m_u)->elem[i][i])
 		{
 			return 1;
 		}
@@ -172,20 +222,20 @@ static mat_t *inv_u(mat_t *m_u)
 	// Go through each row, one by one
 	for (int i = 0; i < n - 1; i++)
 	{
-		inv_m_u->elements[i][i] = 1/m_u->elements[i][i];
+		inv_m_u->elem[i][i] = 1/m_u->elem[i][i];
 		
 		for (int j = i + 1; j < n; j++)
 		{
 			for (int k = 0; k < j; k++)
 			{
-				inv_m_u->elements[i][j] -= inv_m_u->elements[i][k]*m_u->elements[k][j];	
+				inv_m_u->elem[i][j] -= inv_m_u->elem[i][k]*m_u->elem[k][j];	
 			} 
 
-			inv_m_u->elements[i][j] = inv_m_u->elements[i][j]/m_u->elements[j][j];
+			inv_m_u->elem[i][j] = inv_m_u->elem[i][j]/m_u->elem[j][j];
 		}
 	}
 
-	inv_m_u->elements[n - 1][n - 1] = 1/m_u->elements[n - 1][n - 1];
+	inv_m_u->elem[n - 1][n - 1] = 1/m_u->elem[n - 1][n - 1];
 
 	return inv_m_u;
 } 
@@ -208,14 +258,14 @@ static mat_t *inv_l(mat_t *m_l)
 	// Go through each row, one by one
 	for (int i = 0; i < n; i++)
 	{
-		inv_m_l->elements[i][i] = 1;
+		inv_m_l->elem[i][i] = 1;
 
 		for (int j = i - 1; j >= 0; j--)
 		{
-			inv_m_l->elements[i][j] = -1*m_l->elements[i][j];
+			inv_m_l->elem[i][j] = -1*m_l->elem[i][j];
 			for (int k = i - 1; k > j; k--)
 			{
-				inv_m_l->elements[i][j] -= inv_m_l->elements[i][k]*m_l->elements[k][j];	
+				inv_m_l->elem[i][j] -= inv_m_l->elem[i][k]*m_l->elem[k][j];	
 			}
 		}
 	}
@@ -231,6 +281,7 @@ mat_t *inv(mat_t *m_src)
 	}
 
 	mat_t *m_l, *m_u;
+
 	if (lu_fact(&m_l, &m_u, m_src))
 	{
 		free_mat(m_l);
@@ -259,12 +310,12 @@ void free_mat(mat_t *m_src)
 	{
 		for (int i = 0; i < m_src->row; i++)
 		{
-			free(m_src->elements[i]);
-			m_src->elements[i] = NULL;
+			free(m_src->elem[i]);
+			m_src->elem[i] = NULL;
 		}
 
-		free(m_src->elements);
-		m_src->elements = NULL;
+		free(m_src->elem);
+		m_src->elem = NULL;
 
 		free(m_src);
 		m_src = NULL;
@@ -279,7 +330,7 @@ void print_mat(mat_t *m)
 		{
 			for (int j = 0; j < m->col; j++)
 			{
-				printf("%f ", m->elements[i][j]);
+				printf("%f ", m->elem[i][j]);
 			}
 			
 			printf("\n");
