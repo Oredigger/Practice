@@ -5,18 +5,18 @@
 
 typedef struct mat
 {
-	size_t row, col;
+	int row, col;
 	double **elements;
 } mat_t;
 
 // Matrix operations
-mat_t *init(size_t, size_t);
-mat_t *col_vec(mat_t *, size_t);
+mat_t *init(int, int);
+mat_t *col_vec(mat_t *, int);
 mat_t *mat_mult(mat_t *, mat_t *);
 
 // Linear algebra
-void   lu_fact(mat_t **, mat_t **, mat_t *);
-mat_t *inv_mat(mat_t *);
+int     lu_fact(mat_t **, mat_t **, mat_t *);
+mat_t   *inv(mat_t *);
 
 // Cleanup
 void free_mat(mat_t *);

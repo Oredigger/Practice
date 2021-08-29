@@ -5,24 +5,24 @@
 
 int main()
 {
-	mat_t *m = init(2, 2);
+	mat_t *m  = init(3, 3);
 
 	(m->elements)[0][0] = 2;
-	(m->elements)[0][1] = 0;
+	(m->elements)[0][1] = 4;
+	(m->elements)[0][2] = 6;
 
-	(m->elements)[1][0] = 1;
-	(m->elements)[1][1] = 1;
+	(m->elements)[1][0] = 2;
+	(m->elements)[1][1] = 0;
+	(m->elements)[1][2] = 2;
 
-	print_mat(m);
+	(m->elements)[2][0] = 6;
+	(m->elements)[2][1] = 8;
+	(m->elements)[2][2] = 1;
 
-	mat_t *l = NULL;
-	mat_t *u = NULL;
 
-	lu_fact(&l, &u, m);
-	print_mat(l);
-	print_mat(u);
+	mat_t *inv_m = inv(m);
+	print_mat(inv_m);
 
+	free_mat(inv_m);
 	free_mat(m);
-	free_mat(l);
-	free_mat(u);
 }

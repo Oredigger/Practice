@@ -1,8 +1,9 @@
 #include "matrix.h"
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 
-mat_t *init(size_t row, size_t col)
+mat_t *init(int row, int col)
 {
 	mat_t *m = (mat_t *) malloc(sizeof(mat_t));
 	if (!m)
@@ -24,29 +25,22 @@ mat_t *init(size_t row, size_t col)
 
 	for (int i = 0; i < m->row; i++)
 	{
+		m->elements[i] = NULL;	
+	}
+
+	for (int i = 0; i < m->row; i++)
+	{
 		m->elements[i] = (double *) calloc(m->col, sizeof(double));	
 		if (!m->elements[i])
 		{
-			for (int j = 0; j < i; j++)
-			{
-				free(m->elements[j]);
-				m->elements[j] = NULL;
-			}	
-			
-			free(m->elements);
-			m->elements = NULL;
-
-			free(m);
-			m = NULL;
-
-			return NULL;
+			free_mat(m);
 		}
 	}
 
 	return m;
 }
 
-mat_t *col_vec(mat_t *m_src, size_t target_col)
+mat_t *col_vec(mat_t *m_src, int target_col)
 {
 	if (target_col > m_src->col + 1)
 	{
@@ -98,34 +92,37 @@ mat_t *mat_mult(mat_t *m_A, mat_t *m_B)
 	return m_result;
 }
 
-void lu_fact(mat_t **mat_l, mat_t **mat_u, mat_t *mat_src)
+int lu_fact(mat_t **mat_l, mat_t **mat_u, mat_t *mat_src)
 {
-	*mat_l = init(mat_src->row, mat_src->row);
+	int m = mat_src->row;
+	int n = mat_src->col;
+
+	*mat_l = init(m, m);
 	if (!(*mat_l))
 	{
-		return;
+		return -1;
 	}
 
-	*mat_u = init(mat_src->row, mat_src->col);
+	*mat_u = init(m, n);
 	if (!(*mat_u))
 	{
-		return;
+		return -1;
 	}
 
 	// Populate mat_l and mat_u with known immediate values from mat_src based on their
 	// definitions.
-	for (int i = 0; i < mat_src->col; i++)
+	for (int i = 0; i < n; i++)
 	{
 		(*mat_u)->elements[0][i] = mat_src->elements[0][i];
 		(*mat_l)->elements[i][i] = 1;
 	}
 
-	for (int i = 1; i < (*mat_l)->row; i++)
+	for (int i = 1; i < m; i++)
 	{
 		(*mat_l)->elements[i][0] = mat_src->elements[i][0]/mat_src->elements[0][0];
 	}
 
-	for (int i = 1; i < mat_src->row; i++)
+	for (int i = 1; i < m; i++)
 	{
 		// Solve unknowns in row i in mat_l
 		for (int j = 1; j < i; j++)
@@ -141,7 +138,7 @@ void lu_fact(mat_t **mat_l, mat_t **mat_u, mat_t *mat_src)
 		}
 
 		// Solve unknowns in row j in mat_u
-		for (int j = i; j < (*mat_u)->col; j++)
+		for (int j = i; j < n; j++)
 		{
 			(*mat_u)->elements[i][j] = mat_src->elements[i][j];
 			
@@ -151,45 +148,155 @@ void lu_fact(mat_t **mat_l, mat_t **mat_u, mat_t *mat_src)
 			}
 		}
 	}
+
+	// Check for singularity in mat_l or mat_u
+	for (int i = 0; i < mat_src->row; i++)
+	{
+		if (!(*mat_l)->elements[i][i] || !(*mat_u)->elements[i][i])
+		{
+			return 1;
+		}
+	}
+
+	return 0;
 }
 
-mat_t *inv_mat(mat_t *m_src)
+static mat_t *inv_u(mat_t *m_u)
 {
-	mat_t* m_inv = init(m_src->col, m_src->row);
-	if (!m_inv)
+	if (m_u->row != m_u->col)
 	{
 		return NULL;
 	}
 
-	return m_inv;
+	int n = m_u->col;
+
+	mat_t *inv_m_u = init(n, n);
+	if (!inv_m_u)
+	{
+		return NULL;
+	}
+
+	// Go through each row, one by one
+	for (int i = 0; i < n - 1; i++)
+	{
+		inv_m_u->elements[i][i] = 1/m_u->elements[i][i];
+		
+		for (int j = i + 1; j < n; j++)
+		{
+			for (int k = 0; k < j; k++)
+			{
+				inv_m_u->elements[i][j] -= inv_m_u->elements[i][k]*m_u->elements[k][j];	
+			} 
+
+			inv_m_u->elements[i][j] = inv_m_u->elements[i][j]/m_u->elements[j][j];
+		}
+	}
+
+	inv_m_u->elements[n - 1][n - 1] = 1/m_u->elements[n - 1][n - 1];
+
+	return inv_m_u;
+} 
+
+static mat_t *inv_l(mat_t *m_l)
+{
+	if (m_l->row != m_l->col)
+	{
+		return NULL;
+	}
+
+	int n = m_l->col;
+
+	mat_t *inv_m_l = init(n, n);
+	if (!inv_m_l)
+	{
+		return NULL;
+	}
+
+	// Go through each row, one by one
+	for (int i = 0; i < n; i++)
+	{
+		inv_m_l->elements[i][i] = 1;
+
+		for (int j = i - 1; j >= 0; j--)
+		{
+			inv_m_l->elements[i][j] = -1*m_l->elements[i][j];
+			for (int k = i - 1; k > j; k--)
+			{
+				inv_m_l->elements[i][j] -= inv_m_l->elements[i][k]*m_l->elements[k][j];	
+			}
+		}
+	}
+
+	return inv_m_l;
+}
+
+mat_t *inv(mat_t *m_src)
+{
+	if (m_src->row != m_src->col)
+	{
+		return NULL;
+	}
+
+	mat_t *m_l, *m_u;
+	if (lu_fact(&m_l, &m_u, m_src))
+	{
+		free_mat(m_l);
+		free_mat(m_u);
+
+		return NULL;
+	}
+
+	mat_t *inv_m_u = inv_u(m_u);
+	free_mat(m_u);
+
+	mat_t *inv_m_l = inv_l(m_l);
+	free_mat(m_l);
+
+	mat_t *inv_m = mat_mult(inv_m_u, inv_m_l);
+
+	free_mat(inv_m_l);
+	free_mat(inv_m_u);
+
+	return inv_m;
 }
 
 void free_mat(mat_t *m_src)
 {
-	for (int i = 0; i < m_src->row; i++)
+	if (m_src)
 	{
-		free(m_src->elements[i]);
-		m_src->elements[i] = NULL;
+		for (int i = 0; i < m_src->row; i++)
+		{
+			free(m_src->elements[i]);
+			m_src->elements[i] = NULL;
+		}
+
+		free(m_src->elements);
+		m_src->elements = NULL;
+
+		free(m_src);
+		m_src = NULL;
 	}
-
-	free(m_src->elements);
-	m_src->elements = NULL;
-
-	free(m_src);
-	m_src = NULL;
 }
 
 void print_mat(mat_t *m)
 {
-	for (int i = 0; i < m->row; i++)
+	if (m)
 	{
-		for (int j = 0; j < m->col; j++)
+		for (int i = 0; i < m->row; i++)
 		{
-			printf("%f ", m->elements[i][j]);
+			for (int j = 0; j < m->col; j++)
+			{
+				printf("%f ", m->elements[i][j]);
+			}
+			
+			printf("\n");
 		}
-		
+	
 		printf("\n");
 	}
+	else
+	{
+		printf("Cannot print matrix!");
+	}
 	
-	printf("\n");
 }
