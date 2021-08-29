@@ -109,21 +109,14 @@ int lu_fact(mat_t **mat_l, mat_t **mat_u, mat_t *mat_src)
 		return -1;
 	}
 
-	// Populate mat_l and mat_u with known immediate values from mat_src based on their
-	// definitions.
-	for (int i = 0; i < n; i++)
+	for (int i = 0; i < m; i++)
 	{
+		// Populate mat_l and mat_u with known immediate values from mat_src based on their
+		// definitions.
 		(*mat_u)->elements[0][i] = mat_src->elements[0][i];
 		(*mat_l)->elements[i][i] = 1;
-	}
-
-	for (int i = 1; i < m; i++)
-	{
 		(*mat_l)->elements[i][0] = mat_src->elements[i][0]/mat_src->elements[0][0];
-	}
-
-	for (int i = 1; i < m; i++)
-	{
+		
 		// Solve unknowns in row i in mat_l
 		for (int j = 1; j < i; j++)
 		{
